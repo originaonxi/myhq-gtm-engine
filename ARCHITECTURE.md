@@ -24,7 +24,7 @@
                     ┌───────────────────▼───────────────────┐
                     │        ENRICHMENT WATERFALL            │
                     │                                       │
-                    │  Apollo ──→ PDL ──→ Proxycurl ──→     │
+                    │  Apollo ──→ PDL ──→ Netrows ──→     │
                     │  Lusha ──→ Hunter (stop when found)   │
                     │                                       │
                     │  Verify: Millionverifier (email)      │
@@ -139,7 +139,7 @@ v1 used Apollo alone. Apollo's India coverage is ~60%. The waterfall hits 85%+:
 ```
 Apollo (general) → miss? →
 PDL (tech roles, better email) → miss? →
-Proxycurl (LinkedIn-fresh) → miss? →
+Netrows (LinkedIn-fresh) → miss? →
 Lusha (mobile/WhatsApp numbers) → miss? →
 Hunter (email-only fallback)
 ```

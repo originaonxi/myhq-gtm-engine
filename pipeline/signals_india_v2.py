@@ -3,7 +3,7 @@
 Signal priority (highest to lowest confidence):
   TIER 1 — Structured government data (MCA, GST) — hardest proof
   TIER 2 — Verified funding data (Tracxn, Crunchbase) — 48h urgency
-  TIER 3 — Hiring signals (Naukri + LinkedIn via Proxycurl)
+  TIER 3 — Hiring signals (Naukri + LinkedIn via Netrows)
   TIER 4 — News/announcement NLP (Inc42, Entrackr, YourStory)
   TIER 5 — Intent signals (property listings, LinkedIn posts)
 
@@ -29,7 +29,7 @@ from config.settings_v2 import (
     CITIES,
     CRUNCHBASE_API_KEY,
     NEWS_API_KEY,
-    PROXYCURL_API_KEY,
+    NETROWS_API_KEY,
     TRACXN_API_KEY,
     TRIGGER_SIGNALS,
 )
@@ -295,7 +295,7 @@ class CrunchbaseFundingCollector:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# TIER 3 — Hiring signal (Naukri via Apify + LinkedIn via Proxycurl)
+# TIER 3 — Hiring signal (Naukri via Apify + LinkedIn via Netrows)
 # ═══════════════════════════════════════════════════════════════════════
 
 class HiringSignalCollector:
@@ -303,7 +303,7 @@ class HiringSignalCollector:
 
     Sources (in order of priority):
     1. Naukri.com via Apify actor — primary Indian hiring data
-    2. LinkedIn Jobs India via Proxycurl API
+    2. LinkedIn Jobs India via Netrows API (replaces Proxycurl, shut down by LinkedIn lawsuit)
 
     Signal: 8+ postings in one city = active expansion = workspace need
     """
@@ -408,29 +408,38 @@ class HiringSignalCollector:
             return []
 
     def _collect_linkedin_jobs(self, city_code: str) -> list[dict]:
-        """Fallback: LinkedIn Jobs via Proxycurl."""
-        if not PROXYCURL_API_KEY:
+        """Fallback: LinkedIn Jobs via Netrows API.
+
+        Replaces Proxycurl (shut down by LinkedIn lawsuit Jan 2025).
+        Netrows: 48+ LinkedIn endpoints, €0.005/req, real-time.
+        """
+        if not NETROWS_API_KEY:
             return []
 
         city_name = CITIES.get(city_code, {}).get("name", city_code)
         try:
             resp = requests.get(
-                "https://nubela.co/proxycurl/api/v2/linkedin/company/job",
+                "https://api.netrows.com/api/linkedin/jobs/search",
                 params={
-                    "geo_id": city_name,
+                    "location": city_name,
+                    "country": "India",
                     "job_type": "full-time",
-                    "when": "past-month",
+                    "posted_within": "past-month",
+                    "limit": 500,
                 },
-                headers={"Authorization": f"Bearer {PROXYCURL_API_KEY}"},
-                timeout=15,
+                headers={
+                    "x-api-key": NETROWS_API_KEY,
+                    "Accept": "application/json",
+                },
+                timeout=20,
             )
             resp.raise_for_status()
-            jobs = resp.json().get("job", [])
+            jobs = resp.json().get("data", [])
 
             # Aggregate by company
             company_jobs: dict[str, int] = {}
             for job in jobs:
-                company = job.get("company", "Unknown")
+                company = job.get("company_name") or job.get("company", "Unknown")
                 company_jobs[company] = company_jobs.get(company, 0) + 1
 
             return [
@@ -443,14 +452,14 @@ class HiringSignalCollector:
                     "persona": 2,
                     "confidence_score": 70,
                     "job_count": count,
-                    "raw_source": "linkedin_proxycurl",
+                    "raw_source": "linkedin_netrows",
                     "detected_at": datetime.now(IST).isoformat(),
                 }
                 for company, count in company_jobs.items()
                 if count >= self.MIN_POSTINGS
             ]
         except Exception as e:
-            logger.warning("LinkedIn Jobs %s: %s", city_code, e)
+            logger.warning("LinkedIn Jobs (Netrows) %s: %s", city_code, e)
             return []
 
 

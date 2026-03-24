@@ -53,7 +53,7 @@ HEADER = r"""
 ║                   myHQ GTM ENGINE v2.0                       ║
 ║        India-First Signal Intelligence + PKM Bypass          ║
 ║                                                              ║
-║  Tracxn · MCA · Naukri · NewsAPI · Proxycurl · Lusha         ║
+║  Tracxn · MCA · Naukri · NewsAPI · Netrows · Lusha         ║
 ║  PKM profiling → TRAI compliance → WhatsApp-first → AROS    ║
 ╚══════════════════════════════════════════════════════════════╝
 """
@@ -157,7 +157,7 @@ class GTMEngineV2:
             signal_counts = {k: len(v) for k, v in self.all_signals.items() if v}
             self.console.print(f"  Signals: {signal_counts} = {len(flat_signals)} total")
 
-            # Step 2: Enrichment (v2 — waterfall: Apollo→PDL→Proxycurl→Lusha→Hunter)
+            # Step 2: Enrichment (v2 — waterfall: Apollo→PDL→Netrows→Lusha→Hunter)
             progress.update(task, description="[yellow]Enriching contacts…")
             enriched = enrich_signals(flat_signals[:50], dry_run=self.dry_run)
             progress.advance(task)

@@ -17,7 +17,7 @@ APIFY_TOKEN: str = os.getenv("APIFY_TOKEN", "")
 # ── Contact Enrichment (waterfall) ───────────────────────────────────
 APOLLO_API_KEY: str = os.getenv("APOLLO_API_KEY", "")
 PDL_API_KEY: str = os.getenv("PDL_API_KEY", "")
-PROXYCURL_API_KEY: str = os.getenv("PROXYCURL_API_KEY", "")
+NETROWS_API_KEY: str = os.getenv("NETROWS_API_KEY", "")
 LUSHA_API_KEY: str = os.getenv("LUSHA_API_KEY", "")
 HUNTER_API_KEY: str = os.getenv("HUNTER_API_KEY", "")
 

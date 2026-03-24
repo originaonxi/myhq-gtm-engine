@@ -3,7 +3,7 @@
 Waterfall order (try each source, stop when we have what we need):
   1. Apollo.io API — general enrichment, India coverage decent
   2. People Data Labs API — tech roles, better email accuracy
-  3. Proxycurl API — LinkedIn-sourced, freshest data
+  3. Netrows API — 48+ LinkedIn endpoints, real-time, €0.005/req (replaces Proxycurl, which was shut down by LinkedIn lawsuit)
   4. Lusha API — best WhatsApp/mobile number coverage (LinkedIn-sourced)
   5. Hunter.io — email-only fallback
 
@@ -40,7 +40,7 @@ from config.settings_v2 import (
     MILLIONVERIFIER_KEY,
     MSG91_API_KEY,
     PDL_API_KEY,
-    PROXYCURL_API_KEY,
+    NETROWS_API_KEY,
     TRAI_DND_KEY,
 )
 
@@ -129,13 +129,15 @@ class ContactEnricher:
                 result.update({k: v for k, v in pdl.items() if v})
                 result["enrichment_source"] = "pdl"
 
-        # Step 3: Proxycurl (if still no email or need LinkedIn)
-        if (not result["email"] or not result["linkedin_url"]) and PROXYCURL_API_KEY:
-            proxycurl = self._proxycurl_enrich(name, company)
-            if proxycurl:
-                result.update({k: v for k, v in proxycurl.items() if v and not result.get(k)})
+        # Step 3: Netrows (if still no email or need LinkedIn)
+        # Netrows replaces Proxycurl (shut down by LinkedIn lawsuit Jan 2025)
+        # 48+ LinkedIn endpoints, €0.005/req, real-time data
+        if (not result["email"] or not result["linkedin_url"]) and NETROWS_API_KEY:
+            netrows = self._netrows_enrich(name, company)
+            if netrows:
+                result.update({k: v for k, v in netrows.items() if v and not result.get(k)})
                 if not result["enrichment_source"]:
-                    result["enrichment_source"] = "proxycurl"
+                    result["enrichment_source"] = "netrows"
 
         # Step 4: Lusha (if no mobile/WhatsApp yet)
         if not result["phone_mobile"] and result.get("linkedin_url") and LUSHA_API_KEY:
@@ -227,55 +229,68 @@ class ContactEnricher:
             logger.debug("PDL enrich failed: %s", e)
             return {}
 
-    def _proxycurl_enrich(self, name: str, company: str) -> dict:
+    def _netrows_enrich(self, name: str, company: str) -> dict:
+        """Enrich via Netrows API — 48+ LinkedIn endpoints, real-time data.
+
+        Replaces Proxycurl (shut down by LinkedIn lawsuit Jan 2025).
+        Netrows: €0.005/request, 115+ B2B endpoints, real-time.
+        Docs: https://www.netrows.com/docs
+        """
         try:
             parts = name.split() if name else [""]
             first_name = parts[0]
             last_name = parts[-1] if len(parts) > 1 else ""
 
-            # Step 1: Resolve LinkedIn URL
+            # Step 1: Search for LinkedIn profile
             search_resp = requests.get(
-                "https://nubela.co/proxycurl/api/linkedin/profile/resolve",
+                "https://api.netrows.com/api/linkedin/person/search",
                 params={
-                    "company_domain": company,
                     "first_name": first_name,
                     "last_name": last_name,
+                    "company": company,
+                    "country": "India",
                 },
-                headers={"Authorization": f"Bearer {PROXYCURL_API_KEY}"},
+                headers={
+                    "x-api-key": NETROWS_API_KEY,
+                    "Accept": "application/json",
+                },
                 timeout=12,
             )
             search_resp.raise_for_status()
-            linkedin_url = search_resp.json().get("url")
+            results = search_resp.json().get("data", [])
 
+            if not results:
+                return {}
+
+            linkedin_url = results[0].get("linkedin_url") or results[0].get("url", "")
             if not linkedin_url:
                 return {}
 
-            # Step 2: Full profile
+            # Step 2: Full profile enrichment
             profile_resp = requests.get(
-                "https://nubela.co/proxycurl/api/v2/linkedin",
-                params={
-                    "url": linkedin_url,
-                    "personal_email": "include",
-                    "personal_contact_number": "include",
+                "https://api.netrows.com/api/linkedin/person/profile",
+                params={"url": linkedin_url},
+                headers={
+                    "x-api-key": NETROWS_API_KEY,
+                    "Accept": "application/json",
                 },
-                headers={"Authorization": f"Bearer {PROXYCURL_API_KEY}"},
                 timeout=12,
             )
             profile_resp.raise_for_status()
-            p = profile_resp.json()
+            p = profile_resp.json().get("data", {})
 
-            emails = p.get("personal_emails", [])
-            phones = p.get("personal_numbers", [])
+            emails = p.get("emails", [])
+            phones = p.get("phone_numbers", [])
 
             return {
-                "name": p.get("full_name", name),
+                "name": p.get("full_name") or f"{first_name} {last_name}".strip(),
                 "email": emails[0] if emails else None,
                 "phone_mobile": self._format_indian_phone(phones[0] if phones else None),
                 "linkedin_url": linkedin_url,
-                "title": p.get("occupation"),
+                "title": p.get("headline") or p.get("title") or p.get("occupation"),
             }
         except Exception as e:
-            logger.debug("Proxycurl enrich failed: %s", e)
+            logger.debug("Netrows enrich failed: %s", e)
             return {}
 
     def _lusha_enrich(self, linkedin_url: str) -> dict:

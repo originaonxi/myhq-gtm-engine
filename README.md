@@ -15,14 +15,14 @@ A company doing any of these needs workspace:
 | # | Signal | Source | Urgency | Confidence |
 |---|--------|--------|---------|------------|
 | 1 | Seed/Series A funding closed | Tracxn API (primary), Crunchbase | 48h | 95% |
-| 2 | LinkedIn headcount +20% in 90 days | Naukri via Apify, Proxycurl | 7 days | 80% |
+| 2 | LinkedIn headcount +20% in 90 days | Naukri via Apify, Netrows | 7 days | 80% |
 | 3 | New GST registration in a city | GST portal | 14 days | 90% |
 | 4 | MCA new subsidiary incorporated | MCA public API | 14 days | 90% |
 | 5 | Office lease expiry signal | 99acres/MagicBricks | 30 days | 70% |
 | 6 | WFH policy reversal announcement | NewsAPI + NLP | 14 days | 60% |
 | 7 | New city expansion PR | Inc42, Entrackr, YourStory | 7 days | 60% |
 | 8 | Enterprise contract win | News + LinkedIn | 7 days | 60% |
-| 9 | Founder LinkedIn post "hiring fast" | Proxycurl | 7 days | 55% |
+| 9 | Founder LinkedIn post "hiring fast" | Netrows | 7 days | 55% |
 | 10 | Competitor workspace closure | Competitor scraping | 48h | 85% |
 
 Signals 1-4 are **automated with structured Indian data APIs**. Signals 5-10 use NLP on unstructured sources.
@@ -32,7 +32,7 @@ Signals 1-4 are **automated with structured Indian data APIs**. Signals 5-10 use
 ```
 Signal Detection (Tracxn + MCA + Naukri + NewsAPI)
         ↓
-Enrichment Waterfall (Apollo → PDL → Proxycurl → Lusha → Hunter)
+Enrichment Waterfall (Apollo → PDL → Netrows → Lusha → Hunter)
         ↓
 Persona Matching (3 personas, keyword + size scoring)
         ↓
@@ -85,7 +85,7 @@ PKM enforced in: `outreach_generator.py`, `whatsapp_india.py`, `whatsapp_formatt
 Tracxn (~$600/mo) · Crunchbase ($199/mo) · MCA public API (free) · NewsAPI ($449/mo) · Apify/Naukri (~$100/mo)
 
 **Enrichment waterfall:**
-Apollo ($99/mo) → People Data Labs ($0.01/call) → Proxycurl ($0.03/profile) → Lusha ($29/mo) → Hunter (free tier)
+Apollo ($99/mo) → People Data Labs ($0.01/call) → Netrows ($0.03/profile) → Lusha ($29/mo) → Hunter (free tier)
 
 **Verification (India-critical):**
 Millionverifier · MSG91 WhatsApp check · TRAI DND registry
