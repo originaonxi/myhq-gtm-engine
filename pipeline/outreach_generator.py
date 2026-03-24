@@ -45,18 +45,28 @@ class OutreachGenerator:
                 logger.warning("Could not init Anthropic client: %s", exc)
 
     def generate_batch(self, leads: list[dict]) -> list[dict]:
+        """Generate outreach for leads. PKM profile is MANDATORY — no profile, no outreach."""
         records: list[dict] = []
+        pkm_blocked = 0
         for lead in leads:
+            # PKM MANDATE: every message must be defense-calibrated
+            if not lead.get("pkm") or not lead.get("pkm", {}).get("defense_mode"):
+                pkm_blocked += 1
+                logger.warning("PKM BLOCKED outreach: %s — no defense profile", lead.get("company_name"))
+                continue
             try:
                 rec = self.generate_for_lead(lead)
                 if rec:
                     records.append(rec)
             except Exception as exc:
                 logger.error("Outreach generation failed for %s: %s", lead.get("company_name"), exc)
+        if pkm_blocked:
+            logger.warning("PKM BLOCKED: %d leads had no defense profile — outreach skipped", pkm_blocked)
         self._store(records)
         return records
 
     def generate_for_lead(self, lead: dict) -> dict:
+        """Generate outreach for a single lead. Requires lead['pkm'] with defense_mode."""
         wa1 = self._generate_whatsapp_touch1(lead)
         wa2 = self._generate_whatsapp_touch2(lead)
         email1 = self._generate_email(lead)
@@ -197,6 +207,22 @@ Lead context:
     def _get_personalization_rules(self, lead: dict) -> str:
         persona = lead.get("persona_id", 1)
         rules: list[str] = []
+
+        # PKM defense mode rules (MANDATORY — injected into every prompt)
+        pkm = lead.get("pkm", {})
+        defense = pkm.get("defense_mode", "OVERLOAD_AVOIDANCE")
+        bypass = pkm.get("bypass_strategy", "")
+        forbidden = pkm.get("forbidden_phrases", [])
+        cap = pkm.get("message_cap_words", 100)
+
+        rules.append(f"DEFENSE MODE DETECTED: {defense}")
+        if bypass:
+            rules.append(f"BYPASS STRATEGY: {bypass}")
+        if forbidden:
+            rules.append(f"BANNED PHRASES (never use): {', '.join(forbidden)}")
+        rules.append(f"WORD CAP: {cap} words maximum. HARD LIMIT.")
+
+        # Persona-specific rules
         if persona == 1:
             rules.append("Mention their funding round and amount.")
         elif persona == 2:

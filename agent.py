@@ -150,7 +150,17 @@ class GTMEngine:
 
         self.console.print(f"  ✅ {len(leads)} leads ready after enrichment, scoring & compliance\n")
 
-        # Step 6: Generate outreach
+        # Step 5.5: PKM defense profiling (MANDATORY before any outreach)
+        self.console.print("  🧠 PKM defense profiling…")
+        try:
+            from pipeline.pkm_myhq import profile_leads
+            leads = profile_leads(leads, dry_run=self.dry_run)
+            self.all_leads = leads
+            self.console.print(f"  ✅ {len(leads)} leads profiled with PKM defense modes\n")
+        except Exception as exc:
+            logger.error("PKM profiling failed: %s — outreach will be blocked", exc)
+
+        # Step 6: Generate outreach (PKM-gated — no profile = no message)
         self.console.print("  ✍️  Generating outreach…")
         self.outreach_records = generate_outreach(leads, dry_run=self.dry_run)
 

@@ -27,8 +27,26 @@ class WhatsAppFormatter:
         self.templates = self._generate_default_templates()
 
     def format_message(self, lead: dict, message: str, template_category: str = "marketing") -> dict:
-        """Format a message for WhatsApp Business API submission."""
+        """Format a message for WhatsApp Business API submission.
+
+        PKM MANDATE: Lead must have pkm.defense_mode. No profile → no format.
+        """
+        pkm = lead.get("pkm", {})
+        if not pkm or not pkm.get("defense_mode"):
+            logger.warning("PKM BLOCKED format: %s — no defense profile", lead.get("company_name"))
+            return {"error": "pkm_missing", "company": lead.get("company_name")}
+
         phone = format_phone_india(lead.get("contact_phone") or lead.get("contact_whatsapp", ""))
+
+        # Apply PKM word cap
+        word_cap = pkm.get("message_cap_words", self.WORD_LIMIT)
+        self.WORD_LIMIT = min(self.WORD_LIMIT, word_cap)
+
+        # Strip PKM forbidden phrases from message
+        forbidden = pkm.get("forbidden_phrases", [])
+        for phrase in forbidden:
+            message = message.replace(phrase, "").replace(phrase.capitalize(), "")
+
         valid, issues = self.validate_message(message)
         if not valid:
             message = self._fix_message(message, issues)
@@ -44,6 +62,7 @@ class WhatsAppFormatter:
             },
             "lead_id": lead.get("id"),
             "persona_id": lead.get("persona_id"),
+            "defense_mode": pkm.get("defense_mode"),
         }
 
     def validate_message(self, message: str) -> tuple[bool, list[str]]:
@@ -198,11 +217,19 @@ class WhatsAppFormatter:
 
 
 def format_whatsapp_messages(leads: list[dict], dry_run: bool = False) -> list[dict]:
-    """Entry point for WhatsApp formatting."""
+    """Entry point for WhatsApp formatting. PKM is mandatory — no profile, no format."""
     formatter = WhatsAppFormatter(dry_run=dry_run)
     formatted: list[dict] = []
+    pkm_blocked = 0
     for lead in leads:
-        if lead.get("contact_whatsapp") or lead.get("contact_phone"):
-            msg = formatter.format_message(lead, lead.get("_whatsapp_text", ""))
+        if not (lead.get("contact_whatsapp") or lead.get("contact_phone")):
+            continue
+        if not lead.get("pkm") or not lead.get("pkm", {}).get("defense_mode"):
+            pkm_blocked += 1
+            continue
+        msg = formatter.format_message(lead, lead.get("_whatsapp_text", ""))
+        if not msg.get("error"):
             formatted.append(msg)
+    if pkm_blocked:
+        logger.warning("PKM BLOCKED: %d leads skipped WA formatting — no defense profile", pkm_blocked)
     return formatted

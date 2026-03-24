@@ -296,14 +296,18 @@ class OutreachGeneratorV2:
                 pass
 
     def generate_for_lead(self, lead: dict) -> dict:
-        """Generate all outreach messages for a lead."""
-        pkm = lead.get("pkm", {})
+        """Generate all outreach messages for a lead. PKM is MANDATORY."""
+        pkm = lead.get("pkm")
+        if not pkm or not pkm.get("defense_mode"):
+            logger.warning("PKM BLOCKED outreach: %s — no defense profile", lead.get("company_name"))
+            return {}
+
         company = lead.get("company_name", "")
         contact = lead.get("name") or lead.get("founder_name", "Founder")
         city = lead.get("city", "BLR")
         signal_detail = lead.get("signal_detail", "")
-        persona = lead.get("persona", 1)
-        emp = lead.get("employee_count") or 10
+        persona = lead.get("persona") or lead.get("persona_id", 1)
+        emp = lead.get("employee_count") or lead.get("company_size") or 10
         est_desks = max(5, min(emp // 3, 150))
 
         if self.dry_run or not self.client:
@@ -316,9 +320,16 @@ class OutreachGeneratorV2:
         )
 
     def generate_batch(self, leads: list[dict]) -> list[dict]:
-        """Generate outreach for a batch of leads."""
+        """Generate outreach for a batch of leads. PKM is MANDATORY — no profile, no message."""
+        pkm_blocked = 0
         for lead in leads:
+            if not lead.get("pkm") or not lead.get("pkm", {}).get("defense_mode"):
+                pkm_blocked += 1
+                lead["messages"] = {}
+                continue
             lead["messages"] = self.generate_for_lead(lead)
+        if pkm_blocked:
+            logger.warning("PKM BLOCKED: %d leads had no defense profile — messages not generated", pkm_blocked)
         return leads
 
     def _ai_generate(self, lead, pkm, company, contact, city, signal_detail, persona, est_desks) -> dict:

@@ -122,12 +122,18 @@ class WhatsAppSender:
         self.dry_run = dry_run
 
     def send_for_lead(self, lead: dict) -> dict:
-        """Send a WhatsApp message to a single lead."""
+        """Send a WhatsApp message to a single lead. PKM profile is MANDATORY."""
         phone = lead.get("phone_mobile", "")
         contact = lead.get("name") or lead.get("founder_name", "")
         company = lead.get("company_name", "")
-        pkm = lead.get("pkm", {})
-        defense = pkm.get("defense_mode", "OVERLOAD_AVOIDANCE")
+
+        # PKM MANDATE: no profile → no send
+        pkm = lead.get("pkm")
+        if not pkm or not pkm.get("defense_mode"):
+            logger.warning("PKM BLOCKED: %s — no defense profile, refusing to send", company)
+            return {"success": False, "error": "pkm_missing", "company": company}
+
+        defense = pkm["defense_mode"]
         messages = lead.get("messages", {})
 
         # Use pre-generated message if available, otherwise fill template
@@ -187,15 +193,21 @@ class WhatsAppSender:
             return {"success": False, "error": str(e), "company": company}
 
     def send_batch(self, leads: list[dict]) -> list[dict]:
-        """Send WhatsApp to all qualified leads."""
+        """Send WhatsApp to all qualified leads. PKM is mandatory — no profile, no send."""
         results: list[dict] = []
+        pkm_blocked = 0
         for lead in leads:
             if not lead.get("whatsapp_verified"):
                 continue
             if lead.get("dnd_status"):
                 continue
+            if not lead.get("pkm") or not lead.get("pkm", {}).get("defense_mode"):
+                pkm_blocked += 1
+                continue
             result = self.send_for_lead(lead)
             results.append(result)
+        if pkm_blocked:
+            logger.warning("PKM BLOCKED: %d leads skipped — no defense profile", pkm_blocked)
         logger.info("WA batch: %d sent, %d failed",
                      sum(1 for r in results if r.get("success")),
                      sum(1 for r in results if not r.get("success")))
